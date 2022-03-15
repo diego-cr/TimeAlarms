@@ -92,7 +92,7 @@ TimeAlarmsClass::TimeAlarmsClass()
 void TimeAlarmsClass::enable(AlarmID_t ID)
 {
   if (isAllocated(ID)) {
-    if (( !(dtUseAbsoluteValue(Alarm[ID].Mode.alarmType) && (Alarm[ID].value == 0)) ) && (Alarm[ID].onTickHandler != NULL)) {
+    if (( !(dtUseAbsoluteValue(Alarm[ID].Mode.alarmType) && (Alarm[ID].value == 0)) ) && ((Alarm[ID].onTickHandler != NULL) || (Alarm[ID].onTickByteHandler != NULL)) ) {
       // only enable if value is non zero and a tick handler has been set
       // (is not NULL, value is non zero ONLY for dtTimer & dtExplicitAlarm
       // (the rest can have 0 to account for midnight))
@@ -237,6 +237,8 @@ void TimeAlarmsClass::serviceAlarms()
     for (servicedAlarmId = 0; servicedAlarmId < dtNBR_ALARMS; servicedAlarmId++) {
       if (Alarm[servicedAlarmId].Mode.isEnabled && (now() >= Alarm[servicedAlarmId].nextTrigger)) {
         OnTick_t TickHandler = Alarm[servicedAlarmId].onTickHandler;
+		OnTickByte_t TickByteHandler = Alarm[servicedAlarmId].onTickByteHandler;
+		byte param = Alarm[servicedAlarmId].param;
         if (Alarm[servicedAlarmId].Mode.isOneShot) {
           free(servicedAlarmId);  // free the ID if mode is OnShot
         } else {
@@ -244,6 +246,9 @@ void TimeAlarmsClass::serviceAlarms()
         }
         if (TickHandler != NULL) {
           (*TickHandler)();     // call the handler
+        }
+        if (TickByteHandler != NULL) {
+          (*TickByteHandler)(param);     // call the handler
         }
       }
     }
@@ -287,6 +292,26 @@ AlarmID_t TimeAlarmsClass::create(time_t value, OnTick_t onTickHandler, uint8_t 
       if (Alarm[id].Mode.alarmType == dtNotAllocated) {
         // here if there is an Alarm id that is not allocated
         Alarm[id].onTickHandler = onTickHandler;
+        Alarm[id].Mode.isOneShot = isOneShot;
+        Alarm[id].Mode.alarmType = alarmType;
+        Alarm[id].value = value;
+        enable(id);
+        return id;  // alarm created ok
+      }
+    }
+  }
+  return dtINVALID_ALARM_ID; // no IDs available or time is invalid
+}
+
+AlarmID_t TimeAlarmsClass::createbyte(time_t value, OnTickByte_t onTickByteHandler, uint8_t isOneShot, dtAlarmPeriod_t alarmType, byte param)
+{
+  if ( ! ( (dtIsAlarm(alarmType) && now() < SECS_PER_YEAR) || (dtUseAbsoluteValue(alarmType) && (value == 0)) ) ) {
+    // only create alarm ids if the time is at least Jan 1 1971
+    for (uint8_t id = 0; id < dtNBR_ALARMS; id++) {
+      if (Alarm[id].Mode.alarmType == dtNotAllocated) {
+        // here if there is an Alarm id that is not allocated
+        Alarm[id].onTickByteHandler = onTickByteHandler;
+		Alarm[id].param = param;
         Alarm[id].Mode.isOneShot = isOneShot;
         Alarm[id].Mode.alarmType = alarmType;
         Alarm[id].value = value;

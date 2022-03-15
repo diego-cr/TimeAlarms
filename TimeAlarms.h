@@ -57,6 +57,7 @@ typedef AlarmID_t AlarmId;  // Arduino friendly name
 #define AlarmHMS(_hr_, _min_, _sec_) (_hr_ * SECS_PER_HOUR + _min_ * SECS_PER_MIN + _sec_)
 
 typedef void (*OnTick_t)();  // alarm callback function typedef
+typedef void (*OnTickByte_t)(byte param);
 
 // class defining an alarm instance, only used by dtAlarmsClass
 class AlarmClass
@@ -64,10 +65,12 @@ class AlarmClass
 public:
   AlarmClass();
   OnTick_t onTickHandler;
+  OnTickByte_t onTickByteHandler; 
   void updateNextTrigger();
   time_t value;
   time_t nextTrigger;
   AlarmMode_t Mode;
+  byte param;
 };
 
 // class containing the collection of alarms
@@ -79,6 +82,7 @@ private:
   uint8_t isServicing;
   uint8_t servicedAlarmId; // the alarm currently being serviced
   AlarmID_t create(time_t value, OnTick_t onTickHandler, uint8_t isOneShot, dtAlarmPeriod_t alarmType);
+  AlarmID_t createbyte(time_t value, OnTickByte_t onTickByteHandler, uint8_t isOneShot, dtAlarmPeriod_t alarmType, byte param);
 
 public:
   TimeAlarmsClass();
@@ -89,6 +93,10 @@ public:
     if (value <= 0) return dtINVALID_ALARM_ID;
     return create(value, onTickHandler, true, dtExplicitAlarm);
   }
+  AlarmID_t triggerOnce(time_t value, OnTick_t onTickHandler, byte param) {
+    if (value <= 0) return dtINVALID_ALARM_ID;
+    return createbyte(value, onTickHandler, true, dtExplicitAlarm, param);
+  }  
 
   // trigger once at given time of day
   AlarmID_t alarmOnce(time_t value, OnTick_t onTickHandler) {
@@ -98,13 +106,25 @@ public:
   AlarmID_t alarmOnce(const int H, const int M, const int S, OnTick_t onTickHandler) {
     return alarmOnce(AlarmHMS(H,M,S), onTickHandler);
   }
-
+  AlarmID_t alarmOnce(time_t value, OnTick_t onTickHandler, byte param) {
+    if (value <= 0 || value > SECS_PER_DAY) return dtINVALID_ALARM_ID;
+    return createbyte(value, onTickHandler, true, dtDailyAlarm, param);
+  }
+  AlarmID_t alarmOnce(const int H, const int M, const int S, OnTick_t onTickHandler, byte param) {
+    return alarmOnce(AlarmHMS(H,M,S), onTickHandler, param);
+  }
+  
   // trigger once on a given day and time
   AlarmID_t alarmOnce(const timeDayOfWeek_t DOW, const int H, const int M, const int S, OnTick_t onTickHandler) {
     time_t value = (DOW-1) * SECS_PER_DAY + AlarmHMS(H,M,S);
     if (value <= 0) return dtINVALID_ALARM_ID;
     return create(value, onTickHandler, true, dtWeeklyAlarm);
   }
+  AlarmID_t alarmOnce(const timeDayOfWeek_t DOW, const int H, const int M, const int S, OnTick_t onTickHandler, byte param) {
+    time_t value = (DOW-1) * SECS_PER_DAY + AlarmHMS(H,M,S);
+    if (value <= 0) return dtINVALID_ALARM_ID;
+    return createbyte(value, onTickHandler, true, dtWeeklyAlarm, param);
+  }  
 
   // trigger daily at given time of day
   AlarmID_t alarmRepeat(time_t value, OnTick_t onTickHandler) {
@@ -114,14 +134,26 @@ public:
   AlarmID_t alarmRepeat(const int H, const int M, const int S, OnTick_t onTickHandler) {
     return alarmRepeat(AlarmHMS(H,M,S), onTickHandler);
   }
-
+  AlarmID_t alarmRepeat(time_t value, OnTick_t onTickHandler, byte param) {
+    if (value > SECS_PER_DAY) return dtINVALID_ALARM_ID;
+    return createbyte(value, onTickHandler, false, dtDailyAlarm, param);
+  }
+  AlarmID_t alarmRepeat(const int H, const int M, const int S, OnTick_t onTickHandler, byte param) {
+    return alarmRepeat(AlarmHMS(H,M,S), onTickHandler, param);
+  }
+  
   // trigger weekly at a specific day and time
   AlarmID_t alarmRepeat(const timeDayOfWeek_t DOW, const int H, const int M, const int S, OnTick_t onTickHandler) {
     time_t value = (DOW-1) * SECS_PER_DAY + AlarmHMS(H,M,S);
     if (value <= 0) return dtINVALID_ALARM_ID;
     return create(value, onTickHandler, false, dtWeeklyAlarm);
   }
-
+  AlarmID_t alarmRepeat(const timeDayOfWeek_t DOW, const int H, const int M, const int S, OnTick_t onTickHandler, byte param) {
+    time_t value = (DOW-1) * SECS_PER_DAY + AlarmHMS(H,M,S);
+    if (value <= 0) return dtINVALID_ALARM_ID;
+    return createbyte(value, onTickHandler, false, dtWeeklyAlarm, param);
+  }
+  
   // trigger once after the given number of seconds
   AlarmID_t timerOnce(time_t value, OnTick_t onTickHandler) {
     if (value <= 0) return dtINVALID_ALARM_ID;
@@ -129,6 +161,13 @@ public:
   }
   AlarmID_t timerOnce(const int H, const int M, const int S, OnTick_t onTickHandler) {
     return timerOnce(AlarmHMS(H,M,S), onTickHandler);
+  }
+  AlarmID_t timerOnce(time_t value, OnTickByte_t onTickByteHandler, byte param) {
+    if (value <= 0) return dtINVALID_ALARM_ID;
+    return createbyte(value, onTickByteHandler, true, dtTimer, param);
+  }
+  AlarmID_t timerOnce(const int H, const int M, const int S, OnTick_t onTickHandler, byte param) {
+    return timerOnce(AlarmHMS(H,M,S), onTickHandler, param);
   }
 
   // trigger at a regular interval
@@ -139,6 +178,13 @@ public:
   AlarmID_t timerRepeat(const int H,  const int M,  const int S, OnTick_t onTickHandler) {
     return timerRepeat(AlarmHMS(H,M,S), onTickHandler);
   }
+  AlarmID_t timerRepeat(time_t value, OnTick_t onTickHandler, byte param) {
+    if (value <= 0) return dtINVALID_ALARM_ID;
+    return createbyte(value, onTickHandler, false, dtTimer, param);
+  }
+  AlarmID_t timerRepeat(const int H,  const int M,  const int S, OnTick_t onTickHandler, byte param) {
+    return timerRepeat(AlarmHMS(H,M,S), onTickHandler, param);
+  } 
 
   void delay(unsigned long ms);
 

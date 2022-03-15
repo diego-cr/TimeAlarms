@@ -32,7 +32,7 @@ void setup() {
 
   // create timers, to trigger relative to when they're created
   Alarm.timerRepeat(15, Repeats);           // timer for every 15 seconds
-  id = Alarm.timerRepeat(2, Repeats2);      // timer for every 2 seconds
+  id = Alarm.timerRepeat(2, Repeats2, 123); // timer for every 2 seconds (parameter 123) 
   Alarm.timerOnce(10, OnceOnly);            // called once after 10 seconds
 }
 
@@ -62,8 +62,10 @@ void Repeats() {
   Serial.println("15 second timer");
 }
 
-void Repeats2() {
+void Repeats2(byte data) {
   Serial.println("2 second timer");
+  Serial.print("data ");
+  Serial.println(data);
 }
 
 void OnceOnly() {
